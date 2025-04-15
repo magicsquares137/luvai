@@ -21,13 +21,21 @@ import time
 import math
 import pickle
 from contextlib import nullcontext
-
+import wandb
 import numpy as np
 import torch
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.distributed import init_process_group, destroy_process_group
-
 from model import GPTConfig, GPT
+from dotenv import load_dotenv
+
+
+load_dotenv(".env")
+wandb_api_key = os.getenv("WANDB_KEY")
+if wandb_api_key:
+    wandb.login(key=wandb_api_key)
+else:
+    print("WANDB_KEY not found in environment; please check your .env_dev file.")
 
 # -----------------------------------------------------------------------------
 # default config values designed to train a gpt2 (124M) on OpenWebText
@@ -39,6 +47,7 @@ eval_iters = 200
 eval_only = False # if True, script exits right after the first eval
 always_save_checkpoint = True # if True, always save a checkpoint after each eval
 init_from = 'scratch' # 'scratch' or 'resume' or 'gpt2*'
+init_resume_path = None 
 # wandb logging
 wandb_log = False # disabled by default
 wandb_project = 'owt'
@@ -155,10 +164,37 @@ if init_from == 'scratch':
     model_args['vocab_size'] = meta_vocab_size if meta_vocab_size is not None else 50304
     gptconf = GPTConfig(**model_args)
     model = GPT(gptconf)
+# elif init_from == 'resume':
+#     print(f"Resuming training from {out_dir}")
+#     # resume training from a checkpoint.
+#     ckpt_path = os.path.join(out_dir, 'ckpt.pt')
+#     checkpoint = torch.load(ckpt_path, map_location=device)
+#     checkpoint_model_args = checkpoint['model_args']
+#     # force these config attributes to be equal otherwise we can't even resume training
+#     # the rest of the attributes (e.g. dropout) can stay as desired from command line
+#     for k in ['n_layer', 'n_head', 'n_embd', 'block_size', 'bias', 'vocab_size']:
+#         model_args[k] = checkpoint_model_args[k]
+#     # create the model
+#     gptconf = GPTConfig(**model_args)
+#     model = GPT(gptconf)
+#     state_dict = checkpoint['model']
+#     # fix the keys of the state dictionary :(
+#     # honestly no idea how checkpoints sometimes get this prefix, have to debug more
+#     unwanted_prefix = '_orig_mod.'
+#     for k,v in list(state_dict.items()):
+#         if k.startswith(unwanted_prefix):
+#             state_dict[k[len(unwanted_prefix):]] = state_dict.pop(k)
+#     model.load_state_dict(state_dict)
+#     iter_num = checkpoint['iter_num']
+#     best_val_loss = checkpoint['best_val_loss']
 elif init_from == 'resume':
-    print(f"Resuming training from {out_dir}")
-    # resume training from a checkpoint.
-    ckpt_path = os.path.join(out_dir, 'ckpt.pt')
+    print(f"Resuming training from checkpoint")
+    # resume training from a checkpoint
+    # determine which checkpoint to load from
+    resume_path = init_resume_path if init_resume_path else out_dir
+    ckpt_path = os.path.join(resume_path, 'ckpt.pt')
+    print(f"Loading checkpoint from {ckpt_path}")
+    
     checkpoint = torch.load(ckpt_path, map_location=device)
     checkpoint_model_args = checkpoint['model_args']
     # force these config attributes to be equal otherwise we can't even resume training
@@ -178,6 +214,12 @@ elif init_from == 'resume':
     model.load_state_dict(state_dict)
     iter_num = checkpoint['iter_num']
     best_val_loss = checkpoint['best_val_loss']
+    
+    # If we're fine-tuning from a different path, reset iteration number and best val loss
+    if init_resume_path and init_resume_path != out_dir:
+        print(f"Fine-tuning from {init_resume_path} to {out_dir}, resetting iter_num and best_val_loss")
+        iter_num = 0
+        best_val_loss = 1e9
 elif init_from.startswith('gpt2'):
     print(f"Initializing from OpenAI GPT-2 weights: {init_from}")
     # initialize from OpenAI GPT-2 weights
