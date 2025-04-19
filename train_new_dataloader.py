@@ -282,8 +282,27 @@ print(f"Training for {epochs} epochs or until {max_iters} iterations")
 for epoch in range(epochs):
     if ddp:
         train_loader.sampler.set_epoch(epoch)
+
+    print(f"\nEpoch {epoch+1}/{epochs}")
+    epoch_start_time = time.time()
     
     for batch_idx, (X, Y) in enumerate(train_loader):
+
+        progress = (batch_idx + 1) / len(train_loader) * 100
+
+        if batch_idx % (len(train_loader) // 10) == 0 or batch_idx == len(train_loader) - 1:  # Print every 10%
+            elapsed = time.time() - epoch_start_time
+            if batch_idx > 0:  # Avoid division by zero
+                time_per_batch = elapsed / batch_idx
+                remaining = time_per_batch * (len(train_loader) - batch_idx)
+                eta = time.strftime("%H:%M:%S", time.gmtime(remaining))
+            else:
+                eta = "unknown"
+                
+            # Only master process should print
+            if master_process:
+                print(f"Batch {batch_idx+1}/{len(train_loader)} ({progress:.1f}%) - ETA: {eta}")
+
         # determine and set the learning rate for this iteration
         lr = get_lr(iter_num) if decay_lr else learning_rate
         for param_group in optimizer.param_groups:
