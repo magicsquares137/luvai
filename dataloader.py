@@ -4,20 +4,35 @@ import torch
 from torch.utils.data import Dataset, DataLoader, DistributedSampler
 
 class GPTDataset(Dataset):
-    """Dataset for GPT training that tracks epochs correctly"""
+    """Dataset for GPT training with controlled iterations"""
     
-    def __init__(self, data_path, block_size):
+    def __init__(self, data_path, block_size, max_iters=None, batch_size=12):
         self.data = np.memmap(data_path, dtype=np.uint16, mode='r')
         self.block_size = block_size
+        self.total_size = len(self.data) - self.block_size
+        self.batch_size = batch_size
+        
+        # If max_iters is set, limit the dataset size to just what we need
+        if max_iters is not None:
+            self.size = max_iters * batch_size
+        else:
+            self.size = self.total_size
+            
+        print(f"Dataset has {self.total_size:,} potential samples")
+        print(f"Using {self.size:,} samples ({self.size/self.total_size:.2%} of dataset)")
         
     def __len__(self):
-        return len(self.data) - self.block_size
+        return self.size
         
     def __getitem__(self, idx):
+        # Always sample randomly from the full dataset
+        # This ensures we use the entire dataset even with limited iterations
+        real_idx = torch.randint(0, self.total_size, (1,)).item()
+            
         # Get block starting at idx
-        x = torch.from_numpy((self.data[idx:idx+self.block_size]).astype(np.int64))
+        x = torch.from_numpy((self.data[real_idx:real_idx+self.block_size]).astype(np.int64))
         # Target is the same sequence shifted by 1
-        y = torch.from_numpy((self.data[idx+1:idx+1+self.block_size]).astype(np.int64))
+        y = torch.from_numpy((self.data[real_idx+1:real_idx+1+self.block_size]).astype(np.int64))
         return x, y
 
 def create_dataloaders(
