@@ -117,6 +117,7 @@ train_loader, val_loader = create_dataloaders(
     dataset_name=new_dataset,
     block_size=block_size,
     batch_size=batch_size,
+    max_iters=max_iters, 
     distributed=ddp,
     world_size=ddp_world_size,
     rank=ddp_rank,

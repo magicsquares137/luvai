@@ -50,10 +50,10 @@ init_from = 'scratch' # 'scratch' or 'resume' or 'gpt2*'
 init_resume_path = None 
 # wandb logging
 wandb_log = False # disabled by default
-wandb_project = 'owt'
-wandb_run_name = 'gpt2' # 'run' + str(time.time())
+wandb_project = 'dolma'
+wandb_run_name = 'gpt2-continued' # 'run' + str(time.time())
 # data
-dataset = 'openwebtext'
+dataset = 'dolma'
 gradient_accumulation_steps = 5 * 8 # used to simulate larger batch sizes
 batch_size = 12 # if gradient_accumulation_steps > 1, this is the micro-batch size
 block_size = 1024
