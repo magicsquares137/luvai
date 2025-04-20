@@ -111,7 +111,7 @@ ptdtype = {'float32': torch.float32, 'bfloat16': torch.bfloat16, 'float16': torc
 ctx = nullcontext() if device_type == 'cpu' else torch.amp.autocast(device_type=device_type, dtype=ptdtype)
 
 # Create dataloaders for the new dataset
-data_dir = 'data'  # Base directory for datasets
+data_dir = 'data/'  # Base directory for datasets
 train_loader, val_loader = create_dataloaders(
     data_dir=data_dir,
     dataset_name=new_dataset,
@@ -278,6 +278,17 @@ total_steps = len(train_loader)
 epochs = max_iters // total_steps + 1
 print(f"Training for {epochs} epochs or until {max_iters} iterations")
 
+print(f"About to begin iterating through the dataloader (total batches: {len(train_loader)})")
+try:
+    print("Attempting to get the first batch...")
+    # Try to get just the first batch to see if that's where it's hanging
+    first_batch = next(iter(train_loader))
+    print(f"Successfully got first batch with shape: {first_batch[0].shape}")
+except Exception as e:
+    print(f"Error getting first batch: {e}")
+    import traceback
+    traceback.print_exc()
+
 # Start training loop
 for epoch in range(epochs):
     if ddp:
@@ -287,6 +298,8 @@ for epoch in range(epochs):
     epoch_start_time = time.time()
     
     for batch_idx, (X, Y) in enumerate(train_loader):
+        if master_process:
+            print(f"In loop: {batch_idx}")
 
         progress = (batch_idx + 1) / len(train_loader) * 100
 
