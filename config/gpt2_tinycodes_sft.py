@@ -6,7 +6,7 @@ wandb_run_name = 'gpt2-124M-sft'
 # Batch size settings
 batch_size = 8  # Smaller batch size for fine-tuning
 block_size = 1024
-gradient_accumulation_steps = 8  # Reduced from pretraining
+gradient_accumulation_steps = 9  # Reduced from pretraining
 
 # Training duration - much shorter than pretraining
 max_iters = 20000
