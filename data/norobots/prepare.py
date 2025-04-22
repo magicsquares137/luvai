@@ -130,7 +130,10 @@ if __name__ == '__main__':
         print(f"\nWriting {filename}...")
         arr = np.memmap(filename, dtype=dtype, mode='w+', shape=(arr_len,))
         
-        total_batches = 1024
+        # Calculate total_batches based on dataset size
+        # Use a reasonable batch size, but don't exceed dataset size
+        total_batches = min(1024, len(dset))
+        
         idx = 0
         for batch_idx in tqdm(range(total_batches), desc=f'Writing {filename}'):
             # Batch together samples for faster write
