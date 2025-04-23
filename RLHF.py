@@ -361,11 +361,13 @@ def judge_responses(prompts, responses, detailed=True):
         if prompt_type == "code":
             judge_prompt = f"""
             You are evaluating code completions. Rate the following completion on a scale from 1 to 5, where:
-            1 = Completely wrong or off-topic
+            1 = Completely wrong, off-topic, or empty/minimal response
             2 = Major errors, very poor quality
             3 = Partially correct with some errors
             4 = Mostly correct with minor issues
             5 = Excellent, correct and elegant solution
+            
+            Important: Empty or extremely short responses should always receive a score of 1. The assistant must make a genuine attempt to provide an answer.
             
             User request: {clean_prompt}
             
@@ -373,10 +375,10 @@ def judge_responses(prompts, responses, detailed=True):
             {clean_response}
             
             Consider:
+            - Presence: Is there an actual response with substantial content?
             - Correctness: Does the code solve the requested task?
-            - Code quality: Is the code well-structured and following best practices?
-            - Efficiency: Is the algorithm efficient?
-            - Completeness: Does it handle edge cases?
+            - Code quality: Is it well-structured and following best practices?
+            - Completeness: Is it non empty or provides at least some textual information?
             
             Return a JSON object with the following structure:
             {{"score": <number>, "feedback": "<your feedback>"}}
@@ -384,11 +386,13 @@ def judge_responses(prompts, responses, detailed=True):
         elif prompt_type == "empathy":
             judge_prompt = f"""
             You are evaluating responses that require emotional intelligence. Rate the following completion on a scale from 1 to 5, where:
-            1 = Cold, insensitive, or inappropriate
+            1 = Cold, insensitive, inappropriate, or empty/minimal response
             2 = Generic, shallow, or lacking empathy
             3 = Somewhat supportive but formulaic
             4 = Empathetic and helpful
             5 = Exceptionally compassionate, nuanced, and insightful
+            
+            Important: Empty or extremely short responses should always receive a score of 1. The assistant must make a genuine attempt to provide emotional support.
             
             User request: {clean_prompt}
             
@@ -396,6 +400,7 @@ def judge_responses(prompts, responses, detailed=True):
             {clean_response}
             
             Consider:
+            - Presence: Is there an actual response with substantial content?
             - Empathy: Does the response show understanding of emotions?
             - Helpfulness: Does it provide actionable advice or comfort?
             - Tone: Is the language warm, respectful, and supportive?
@@ -407,11 +412,13 @@ def judge_responses(prompts, responses, detailed=True):
         else:  # creative
             judge_prompt = f"""
             You are evaluating creative or explanatory responses. Rate the following completion on a scale from 1 to 5, where:
-            1 = Poor quality, incoherent, or off-topic
+            1 = Poor quality, incoherent, off-topic, or empty/minimal response
             2 = Basic, unimaginative, or unclear
             3 = Adequate but lacking originality or depth
             4 = Well-written, thoughtful, and engaging
             5 = Exceptional, insightful, and memorable
+            
+            Important: Empty or extremely short responses should always receive a score of 1. The assistant must make a genuine attempt to provide creative content.
             
             User request: {clean_prompt}
             
@@ -419,6 +426,7 @@ def judge_responses(prompts, responses, detailed=True):
             {clean_response}
             
             Consider:
+            - Presence: Is there an actual response with substantial content?
             - Relevance: Does it address the prompt directly?
             - Clarity: Is the response well-structured and easy to follow?
             - Depth: Does it show insight or thoughtfulness?
