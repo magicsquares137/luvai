@@ -213,8 +213,8 @@ def get_diverse_prompts(config, num_prompts=50):
     # Generate the prompts
     # 1. Code prompts (40%)
     for _ in range(int(num_prompts * 0.4)):
-        template = random.choice(code_prompt_templates)
-        task = random.choice(code_tasks)
+        template = random.choice(empathy_templates)
+        task = random.choice(empathy_situations)
         prompt = f"<|im_start|>user\n{template.format(task=task)}<|im_end|>"
         prompts.append(prompt)
     
@@ -300,39 +300,35 @@ def generate_responses(model, encode_fn, decode_fn, prompts, config):
 
 # Call Mistral API for judging responses
 def call_mistral_api(prompt):
-    """Call Mistral API to get a response"""
+    """Call Mistral API to get a response using the official client library"""
+    from mistralai import Mistral
+    import os
+    
     api_key = os.getenv("MISTRAL_API_KEY")
     if not api_key:
         raise ValueError("MISTRAL_API_KEY environment variable not set")
     
-    headers = {
-        "Content-Type": "application/json",
-        "Accept": "application/json",
-        "Authorization": f"Bearer {api_key}"
-    }
+    client = Mistral(api_key=api_key)
     
-    payload = {
-        "model": "mistral-small-latest",
-        "messages": [
-            {"role": "system", "content": "You are a helpful AI assistant who evaluates response quality."},
-            {"role": "user", "content": prompt}
-        ],
-        "temperature": 0,
-        "max_tokens": 300,
-        "response_format": {"type": "json_object"}
-    }
-    
-    response = requests.post(
-        "https://api.mistral.ai/v1/chat/completions",
-        headers=headers,
-        json=payload
-    )
-    
-    if response.status_code != 200:
-        raise Exception(f"Mistral API error: {response.text}")
-    
-    result = response.json()["choices"][0]["message"]["content"]
-    return result
+    # Call the API with JSON response format
+    try:
+        chat_response = client.chat.complete(
+            model="mistral-small-latest",
+            messages=[
+                {"role": "system", "content": "You are a helpful AI assistant who evaluates response quality."},
+                {"role": "user", "content": prompt}
+            ],
+            response_format={"type": "json_object"},
+            temperature=0,
+            max_tokens=300
+        )
+        
+        # Extract the content from the response
+        result = chat_response.choices[0].message.content
+        return result
+        
+    except Exception as e:
+        raise Exception(f"Mistral API error: {str(e)}")
 
 # Judge responses using Mistral API
 def judge_responses(prompts, responses, detailed=True):
