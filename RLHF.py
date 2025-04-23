@@ -98,7 +98,7 @@ def get_tokenizer():
     enc = tiktoken.get_encoding("gpt2")
     
     def encode(s):
-        return enc.encode(s, allowed_special={"<|im_start|>", "<|im_end|>"})
+        return enc.encode(s, allowed_special={"<|im_start|>", "<|im_end|>", "<|endoftext|>"})
     
     def decode(l):
         return enc.decode(l)
