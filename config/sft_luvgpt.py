@@ -9,8 +9,8 @@ block_size = 1024
 gradient_accumulation_steps = 9  # Divisible by 3 for 3 GPUs
 
 # Training duration
-max_iters = 6000  # Adjust based on dataset size
-lr_decay_iters = 6000
+max_iters = 73000  # Adjust based on dataset size
+lr_decay_iters = 73000
 
 # Learning rate settings
 learning_rate = 5e-6
