@@ -214,7 +214,7 @@ def get_diverse_prompts(config, num_prompts=50):
     # 1. Code prompts (40%)
     for _ in range(int(num_prompts * 0.4)):
         template = random.choice(empathy_templates)
-        task = random.choice(empathy_situations)
+        situation = random.choice(empathy_situations)
         prompt = f"<|im_start|>user\n{template.format(situation=situation)}<|im_end|>"
         prompts.append(prompt)
     
