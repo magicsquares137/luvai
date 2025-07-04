@@ -37,7 +37,11 @@ class GenerateSampleOlmoMix:
             print(f"\n=== Processing {source_key} (target: {target_tokens:,} tokens) ===")
             
             # Get filenames with source_key in them
-            file_subset = [file for file in self.files if source_key in file and file.endswith('.json.gz')]
+            if source_key == "dclm":
+                # DCLM files use .jsonl.zstd format
+                file_subset = [file for file in self.files if source_key in file and file.endswith('.jsonl.zstd')]
+            else:
+                file_subset = [file for file in self.files if source_key in file and file.endswith('.json.gz')]
             
             if len(file_subset) == 0:
                 print(f"Unable to find files for: {source_key}")
@@ -62,44 +66,79 @@ class GenerateSampleOlmoMix:
                     )
                     
                     current_tokens = 0
-                    with gzip.open(file_path, 'rt', encoding='utf-8') as f:
-                        for line in f:
-                            if current_tokens >= tokens_per_file:
-                                break
-                                
-                            try:
-                                example = json.loads(line.strip())
-                                text = example.get('text', '')
-                                
-                                if not text:  # Skip empty text
-                                    print(f"Empty text for example: {example}")
-                                    proceed = input("Continue (y/n):")
-                                    if proceed == 'y':
-                                        continue
-                                    else:
+                    
+                    # Handle different compression formats
+                    if filename.endswith('.jsonl.zstd'):
+                        import zstandard as zstd
+                        with open(file_path, 'rb') as compressed_file:
+                            dctx = zstd.ZstdDecompressor()
+                            with dctx.stream_reader(compressed_file) as reader:
+                                text_reader = reader.read().decode('utf-8')
+                                for line in text_reader.splitlines():
+                                    if current_tokens >= tokens_per_file:
                                         break
-                                
-                                # Estimate tokens in this example
-                                example_tokens = len(text) // self.estimated_characters_per_token
-                                
-                                if current_tokens + example_tokens <= tokens_per_file:
-                                    # Convert to Megatron format
-                                    megatron_example = {
-                                        "text": text,
-                                        "src": source_key,
-                                        "type": source_key,
-                                        "id": str(sample_id),
-                                        "title": example.get('id', f"{source_key}_{sample_id}")
-                                    }
                                     
-                                    self.sampled_data.append(megatron_example)
-                                    current_tokens += example_tokens
-                                    sample_id += 1
-                                else:
+                                    try:
+                                        example = json.loads(line.strip())
+                                        text = example.get('text', '')
+                                        
+                                        if not text:
+                                            continue
+                                        
+                                        example_tokens = len(text) // self.estimated_characters_per_token
+                                        
+                                        if current_tokens + example_tokens <= tokens_per_file:
+                                            megatron_example = {
+                                                "text": text,
+                                                "src": source_key,
+                                                "type": source_key,
+                                                "id": str(sample_id),
+                                                "title": example.get('id', f"{source_key}_{sample_id}")
+                                            }
+                                            
+                                            self.sampled_data.append(megatron_example)
+                                            current_tokens += example_tokens
+                                            sample_id += 1
+                                        else:
+                                            break
+                                            
+                                    except json.JSONDecodeError:
+                                        continue
+                    else:
+                        # Handle .json.gz files
+                        with gzip.open(file_path, 'rt', encoding='utf-8') as f:
+                            for line in f:
+                                if current_tokens >= tokens_per_file:
                                     break
                                     
-                            except json.JSONDecodeError:
-                                continue
+                                try:
+                                    example = json.loads(line.strip())
+                                    text = example.get('text', '')
+                                    
+                                    if not text:  # Skip empty text
+                                        continue
+                                    
+                                    # Estimate tokens in this example
+                                    example_tokens = len(text) // self.estimated_characters_per_token
+                                    
+                                    if current_tokens + example_tokens <= tokens_per_file:
+                                        # Convert to Megatron format
+                                        megatron_example = {
+                                            "text": text,
+                                            "src": source_key,
+                                            "type": source_key,
+                                            "id": str(sample_id),
+                                            "title": example.get('id', f"{source_key}_{sample_id}")
+                                        }
+                                        
+                                        self.sampled_data.append(megatron_example)
+                                        current_tokens += example_tokens
+                                        sample_id += 1
+                                    else:
+                                        break
+                                        
+                                except json.JSONDecodeError:
+                                    continue
                     
                     print(f"    Sampled {current_tokens:,} tokens from this file")
                     
