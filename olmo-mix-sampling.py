@@ -17,7 +17,7 @@ class GenerateSampleOlmoMix:
             "algebraic-stack": 166000000, # 166M
             "wiki": 51000000           # 51M
         }
-        self.tokens_per_gz = 600000000
+        self.tokens_per_gz = 150000000
         self.dataset_name = "allenai/olmo-mix-1124"
         self.sampled_data = []
         
@@ -188,6 +188,17 @@ class GenerateSampleOlmoMix:
 
 # Usage example:
 if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Generate sampled olmo-mix-1124 dataset in Megatron format.")
+    parser.add_argument(
+        "output_path",
+        type=str,
+        help="Output path to save the sampled data JSONL file"
+    )
+
+    args = parser.parse_args()
+
     sampler = GenerateSampleOlmoMix(num_samples=55000000000)  # 55B tokens
     sampler.download_sample()
-    sampler.save_megatron_format("olmo_mix_sample.json")
+    sampler.save_megatron_format(args.output_path)
