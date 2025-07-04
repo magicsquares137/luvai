@@ -59,10 +59,15 @@ class GenerateSampleOlmoMix:
                 print(f"  Processing: {filename}")
                 
                 try:
+                    # Create cache directory on Seagate
+                    cache_dir = "/mnt/seagate/dolmino_full/hf_cache"
+                    os.makedirs(cache_dir, exist_ok=True)
+                    
                     file_path = hf_hub_download(
                         repo_id=self.dataset_name, 
                         filename=filename, 
-                        repo_type="dataset"
+                        repo_type="dataset",
+                        cache_dir=cache_dir
                     )
                     
                     current_tokens = 0
