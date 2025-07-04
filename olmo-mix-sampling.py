@@ -9,13 +9,13 @@ class GenerateSampleOlmoMix:
         self.num_samples = num_samples
         self.estimated_characters_per_token = 4
         self.tokens_per_source = {
-            "dclm": 5000000000, 
-            "algebraic-stack": 165000000, 
-            "arxiv": 290000000, 
-            "open-web-math": 171000000, 
-            "pes2o": 825000000, 
-            "starcoder": 1170000000, 
-            "wiki": 50000000
+            "dclm": 52300000000,        # 52.3B
+            "starcoder": 1170000000,    # 1.17B
+            "pes2o": 825000000,         # 825M  
+            "arxiv": 292000000,         # 292M
+            "open-web-math": 172000000, # 172M
+            "algebraic-stack": 166000000, # 166M
+            "wiki": 51000000           # 51M
         }
         self.tokens_per_gz = 600000000
         self.dataset_name = "allenai/olmo-mix-1124"
@@ -73,8 +73,8 @@ class GenerateSampleOlmoMix:
                             repo_type="dataset",
                             cache_dir=temp_dir
                         )
-                    
-                    current_tokens = 0
+                        
+                        current_tokens = 0
                     
                     # Handle different compression formats
                     if filename.endswith('.jsonl.zstd'):
