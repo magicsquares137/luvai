@@ -59,16 +59,17 @@ class GenerateSampleOlmoMix:
                 print(f"  Processing: {filename}")
                 
                 try:
-                    # Create cache directory on Seagate
-                    cache_dir = "/mnt/seagate/dolmino_full/hf_cache"
-                    os.makedirs(cache_dir, exist_ok=True)
+                    # Use /tmp for downloads, process immediately, then delete
+                    import tempfile
+                    import shutil
                     
-                    file_path = hf_hub_download(
-                        repo_id=self.dataset_name, 
-                        filename=filename, 
-                        repo_type="dataset",
-                        cache_dir=cache_dir
-                    )
+                    with tempfile.TemporaryDirectory() as temp_dir:
+                        file_path = hf_hub_download(
+                            repo_id=self.dataset_name, 
+                            filename=filename, 
+                            repo_type="dataset",
+                            cache_dir=temp_dir
+                        )
                     
                     current_tokens = 0
                     
@@ -144,8 +145,9 @@ class GenerateSampleOlmoMix:
                                         
                                 except json.JSONDecodeError:
                                     continue
-                    
-                    print(f"    Sampled {current_tokens:,} tokens from this file")
+                        
+                        print(f"    Sampled {current_tokens:,} tokens from this file")
+                    # File is automatically deleted when temp_dir context exits
                     
                 except Exception as e:
                     print(f"    Error processing {filename}: {e}")
