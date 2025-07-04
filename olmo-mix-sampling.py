@@ -62,10 +62,9 @@ class GenerateSampleOlmoMix:
                     # Use /tmp for downloads, process immediately, then delete
                     import tempfile
                     import shutil
-                    
-                    # Create temp directory but don't auto-delete it yet
+
                     temp_dir = tempfile.mkdtemp()
-                    
+
                     try:
                         file_path = hf_hub_download(
                             repo_id=self.dataset_name, 
@@ -73,29 +72,63 @@ class GenerateSampleOlmoMix:
                             repo_type="dataset",
                             cache_dir=temp_dir
                         )
-                        
+
                         current_tokens = 0
-                    
-                    # Handle different compression formats
-                    if filename.endswith('.jsonl.zstd'):
-                        import zstandard as zstd
-                        with open(file_path, 'rb') as compressed_file:
-                            dctx = zstd.ZstdDecompressor()
-                            with dctx.stream_reader(compressed_file) as reader:
-                                text_reader = reader.read().decode('utf-8')
-                                for line in text_reader.splitlines():
+
+                        # Handle different compression formats
+                        if filename.endswith('.jsonl.zstd'):
+                            import zstandard as zstd
+                            with open(file_path, 'rb') as compressed_file:
+                                dctx = zstd.ZstdDecompressor()
+                                with dctx.stream_reader(compressed_file) as reader:
+                                    text_reader = reader.read().decode('utf-8')
+                                    for line in text_reader.splitlines():
+                                        if current_tokens >= tokens_per_file:
+                                            break
+
+                                        try:
+                                            example = json.loads(line.strip())
+                                            text = example.get('text', '')
+
+                                            if not text:
+                                                continue
+
+                                            example_tokens = len(text) // self.estimated_characters_per_token
+
+                                            if current_tokens + example_tokens <= tokens_per_file:
+                                                megatron_example = {
+                                                    "text": text,
+                                                    "src": source_key,
+                                                    "type": source_key,
+                                                    "id": str(sample_id),
+                                                    "title": example.get('id', f"{source_key}_{sample_id}")
+                                                }
+
+                                                self.sampled_data.append(megatron_example)
+                                                current_tokens += example_tokens
+                                                sample_id += 1
+                                            else:
+                                                break
+
+                                        except json.JSONDecodeError:
+                                            continue
+
+                        else:
+                            # Handle .json.gz files
+                            with gzip.open(file_path, 'rt', encoding='utf-8') as f:
+                                for line in f:
                                     if current_tokens >= tokens_per_file:
                                         break
-                                    
+
                                     try:
                                         example = json.loads(line.strip())
                                         text = example.get('text', '')
-                                        
+
                                         if not text:
                                             continue
-                                        
+
                                         example_tokens = len(text) // self.estimated_characters_per_token
-                                        
+
                                         if current_tokens + example_tokens <= tokens_per_file:
                                             megatron_example = {
                                                 "text": text,
@@ -104,60 +137,25 @@ class GenerateSampleOlmoMix:
                                                 "id": str(sample_id),
                                                 "title": example.get('id', f"{source_key}_{sample_id}")
                                             }
-                                            
+
                                             self.sampled_data.append(megatron_example)
                                             current_tokens += example_tokens
                                             sample_id += 1
                                         else:
                                             break
-                                            
+
                                     except json.JSONDecodeError:
                                         continue
-                    else:
-                        # Handle .json.gz files
-                        with gzip.open(file_path, 'rt', encoding='utf-8') as f:
-                            for line in f:
-                                if current_tokens >= tokens_per_file:
-                                    break
-                                    
-                                try:
-                                    example = json.loads(line.strip())
-                                    text = example.get('text', '')
-                                    
-                                    if not text:  # Skip empty text
-                                        continue
-                                    
-                                    # Estimate tokens in this example
-                                    example_tokens = len(text) // self.estimated_characters_per_token
-                                    
-                                    if current_tokens + example_tokens <= tokens_per_file:
-                                        # Convert to Megatron format
-                                        megatron_example = {
-                                            "text": text,
-                                            "src": source_key,
-                                            "type": source_key,
-                                            "id": str(sample_id),
-                                            "title": example.get('id', f"{source_key}_{sample_id}")
-                                        }
-                                        
-                                        self.sampled_data.append(megatron_example)
-                                        current_tokens += example_tokens
-                                        sample_id += 1
-                                    else:
-                                        break
-                                        
-                                except json.JSONDecodeError:
-                                    continue
-                        
-                        print(f"    Sampled {current_tokens:,} tokens from this file")
-                        
+
+                            print(f"    Sampled {current_tokens:,} tokens from this file")
+
                     finally:
-                        # Clean up temp directory
                         shutil.rmtree(temp_dir, ignore_errors=True)
-                    
+
                 except Exception as e:
                     print(f"    Error processing {filename}: {e}")
                     continue
+
     
     def save_megatron_format(self, output_path: str):
         """Save in loose JSON format for Megatron preprocessing"""
