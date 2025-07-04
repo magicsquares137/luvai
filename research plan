@@ -1,0 +1,49 @@
+Overall goal:
+match or exceed comparable expectations of results on key benchmarks:
+OLMES - MCF, OLMES - Gen, MMLU, GSM, Arc, HSwag, WinoG, NQ, DROP
+
+olmo2 (https://arxiv.org/pdf/2501.00656) used a two phase strategy, with olmo-mix-1124 on HF for stage 1 pretraining 3.9T tokens, 
+and dolmino, 50B tokens, for mid training. 
+
+key findings in their decoder only architecture were:
+-weight decaying is no/negative impact
+-adam epsilon value was important in loss decay
+-repeated n grams in training data led to loss spikes, they used data curation and a custom loader to filter n grams to reduce spikes
+-they use z loss regularization, and note that they used a custom implementation bc the flash attention implementation they found to have some bug
+-they changed computation patterns in the blocks, using RMSnorm, they normalize the outputs to the attention and feed forward layers within a block instead of
+just block inputs
+-QK norm - they normalize QK projections with RMS norm before calculating attention
+-they initialize weights with a gaussian centered at 0 with STD 0.02
+-model souping, they train several model variants with different dataset random seeds and average the models
+
+post training:
+- they used prompts taken from various sources to generate preferences, and use GPT4o to rank preferences and run several rounds of DPO, HPs detailed in paper
+- they used SFT data with pairs taken from Tulu dataset, open sourced
+- they use RLVF with PPO for math tuning
+
+Data studies:
+they run various ablation studies with different sources, focusing on improving benchmarks with sampling from various open source datasets
+
+they end up with data proportions mixed in percents detailed in the paper for both stage 1 and stage 2 pretraining
+
+there doesnt seem to be any order to the pretraining beyond the mix proportions
+
+paths to study:
+weight tying dynamics
+hybrid SSM architectures and hp sweeps of different config layouts
+
+stage 1 goal should be comparable, optimizing across benchmarks using what they found to work well,
+stage 2 - can we find a post training process that optimizes for ai companionship rather than quantiative performance?
+look into initialization with pure random numbers vs psuedo random gaussian
+
+replicate their stage 1 and mid training process, but investigate hybrid architectures and weight tying in addition to what they found to work
+stage 2: look into curriculum learning, rather than mix proportions, try staged learning based on topics and also model souping
+
+stage 3: look into ppo based rewards based on actual data from website interactions with larger models, use llm as a judge for a proxy reward model
+
+High-impact, manageable scope:
+
+Hybrid architectures could be a major contribution if SSMs help efficiency
+Weight tying is practical and understudied
+Companionship post-training is genuinely novel
+Model souping gives you ensemble benefits

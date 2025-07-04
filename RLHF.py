@@ -724,3 +724,7 @@ if __name__ == "__main__":
     
     config = RLHFConfig()
     train_rlhf(config)
+
+# not using clipped objective in ppo
+# not using a value functoin, just rewards
+# add linear projection into output of transformer for value function

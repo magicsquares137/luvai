@@ -1,0 +1,239 @@
+{
+  "best_params": {
+    "gamma": 0.95,
+    "optim_learn_rate": 0.02,
+    "user_baseline": true,
+    "hidden_dim": 64,
+    "episodes": 300,
+    "verbose": false,
+    "plot": false,
+    "render": false
+  },
+  "all_results": [
+    {
+      "run": 5,
+      "params": {
+        "gamma": 0.95,
+        "optim_learn_rate": 0.02,
+        "user_baseline": true,
+        "hidden_dim": 64,
+        "episodes": 300,
+        "verbose": false,
+        "plot": false,
+        "render": false
+      },
+      "mean_reward": 40.35426010718807,
+      "final_loss": -287.88701912879947
+    },
+    {
+      "run": 12,
+      "params": {
+        "gamma": 0.95,
+        "optim_learn_rate": 0.02,
+        "user_baseline": false,
+        "hidden_dim": 64,
+        "episodes": 300,
+        "verbose": false,
+        "plot": false,
+        "render": false
+      },
+      "mean_reward": 1.8416084922807547,
+      "final_loss": -592.6481301879883
+    },
+    {
+      "run": 2,
+      "params": {
+        "gamma": 0.95,
+        "optim_learn_rate": 0.005,
+        "user_baseline": false,
+        "hidden_dim": 96,
+        "episodes": 300,
+        "verbose": false,
+        "plot": false,
+        "render": false
+      },
+      "mean_reward": -41.27538956987947,
+      "final_loss": -1062.636535358429
+    },
+    {
+      "run": 15,
+      "params": {
+        "gamma": 0.9,
+        "optim_learn_rate": 0.01,
+        "user_baseline": true,
+        "hidden_dim": 32,
+        "episodes": 300,
+        "verbose": false,
+        "plot": false,
+        "render": false
+      },
+      "mean_reward": -57.65111058518582,
+      "final_loss": -287.99223295211794
+    },
+    {
+      "run": 1,
+      "params": {
+        "gamma": 0.9,
+        "optim_learn_rate": 0.005,
+        "user_baseline": true,
+        "hidden_dim": 80,
+        "episodes": 300,
+        "verbose": false,
+        "plot": false,
+        "render": false
+      },
+      "mean_reward": -66.32551652510256,
+      "final_loss": -230.42144483566284
+    },
+    {
+      "run": 7,
+      "params": {
+        "gamma": 0.9,
+        "optim_learn_rate": 0.01,
+        "user_baseline": true,
+        "hidden_dim": 32,
+        "episodes": 300,
+        "verbose": false,
+        "plot": false,
+        "render": false
+      },
+      "mean_reward": -70.83017606792731,
+      "final_loss": -77.6915986251831
+    },
+    {
+      "run": 11,
+      "params": {
+        "gamma": 0.9,
+        "optim_learn_rate": 0.02,
+        "user_baseline": false,
+        "hidden_dim": 32,
+        "episodes": 300,
+        "verbose": false,
+        "plot": false,
+        "render": false
+      },
+      "mean_reward": -77.34629370801332,
+      "final_loss": -1245.2849670791627
+    },
+    {
+      "run": 6,
+      "params": {
+        "gamma": 0.99,
+        "optim_learn_rate": 0.01,
+        "user_baseline": true,
+        "hidden_dim": 80,
+        "episodes": 300,
+        "verbose": false,
+        "plot": false,
+        "render": false
+      },
+      "mean_reward": -91.28802490104877,
+      "final_loss": -91.90692872047424
+    },
+    {
+      "run": 14,
+      "params": {
+        "gamma": 0.99,
+        "optim_learn_rate": 0.001,
+        "user_baseline": true,
+        "hidden_dim": 112,
+        "episodes": 300,
+        "verbose": false,
+        "plot": false,
+        "render": false
+      },
+      "mean_reward": -106.00837419925826,
+      "final_loss": 30.592856044769288
+    },
+    {
+      "run": 10,
+      "params": {
+        "gamma": 0.995,
+        "optim_learn_rate": 0.001,
+        "user_baseline": true,
+        "hidden_dim": 128,
+        "episodes": 300,
+        "verbose": false,
+        "plot": false,
+        "render": false
+      },
+      "mean_reward": -151.902781310531,
+      "final_loss": -26.62370032787323
+    },
+    {
+      "run": 9,
+      "params": {
+        "gamma": 0.995,
+        "optim_learn_rate": 0.01,
+        "user_baseline": false,
+        "hidden_dim": 48,
+        "episodes": 300,
+        "verbose": false,
+        "plot": false,
+        "render": false
+      },
+      "mean_reward": -158.94052841419224,
+      "final_loss": -11943.01008178711
+    },
+    {
+      "run": 13,
+      "params": {
+        "gamma": 0.9,
+        "optim_learn_rate": 0.05,
+        "user_baseline": true,
+        "hidden_dim": 64,
+        "episodes": 300,
+        "verbose": false,
+        "plot": false,
+        "render": false
+      },
+      "mean_reward": -225.4566801136468,
+      "final_loss": 49.48419596195221
+    },
+    {
+      "run": 4,
+      "params": {
+        "gamma": 0.95,
+        "optim_learn_rate": 0.01,
+        "user_baseline": true,
+        "hidden_dim": 32,
+        "episodes": 300,
+        "verbose": false,
+        "plot": false,
+        "render": false
+      },
+      "mean_reward": -265.37389510243025,
+      "final_loss": 667.744252204895
+    },
+    {
+      "run": 3,
+      "params": {
+        "gamma": 0.995,
+        "optim_learn_rate": 0.02,
+        "user_baseline": true,
+        "hidden_dim": 80,
+        "episodes": 300,
+        "verbose": false,
+        "plot": false,
+        "render": false
+      },
+      "mean_reward": -570.5260093715438,
+      "final_loss": -41.14173088148236
+    },
+    {
+      "run": 8,
+      "params": {
+        "gamma": 0.995,
+        "optim_learn_rate": 0.05,
+        "user_baseline": true,
+        "hidden_dim": 80,
+        "episodes": 300,
+        "verbose": false,
+        "plot": false,
+        "render": false
+      },
+      "mean_reward": -574.0890495004957,
+      "final_loss": -0.000127224987372756
+    }
+  ]
+}
