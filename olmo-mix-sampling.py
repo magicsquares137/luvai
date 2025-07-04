@@ -63,7 +63,10 @@ class GenerateSampleOlmoMix:
                     import tempfile
                     import shutil
                     
-                    with tempfile.TemporaryDirectory() as temp_dir:
+                    # Create temp directory but don't auto-delete it yet
+                    temp_dir = tempfile.mkdtemp()
+                    
+                    try:
                         file_path = hf_hub_download(
                             repo_id=self.dataset_name, 
                             filename=filename, 
@@ -147,7 +150,10 @@ class GenerateSampleOlmoMix:
                                     continue
                         
                         print(f"    Sampled {current_tokens:,} tokens from this file")
-                    # File is automatically deleted when temp_dir context exits
+                        
+                    finally:
+                        # Clean up temp directory
+                        shutil.rmtree(temp_dir, ignore_errors=True)
                     
                 except Exception as e:
                     print(f"    Error processing {filename}: {e}")
