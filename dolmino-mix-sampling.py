@@ -36,6 +36,9 @@ class GenerateSampleDolminoMix:
         self.total_tokens = 0
         self.source_stats = defaultdict(lambda: {'examples': 0, 'tokens': 0})
         
+        # Track which files were actually sampled
+        self.sampled_files = defaultdict(list)
+        
         # Convert desired tokens to file counts
         self.file_counts = {}
         for key, value in self.tokens_per_source.items():
@@ -53,7 +56,7 @@ class GenerateSampleDolminoMix:
             # Others use .json.gz files
             return [file for file in self.files if source_key in file and file.endswith('.json.gz')]
     
-    def process_file_by_format(self, file_path, filename, source_key, tokens_per_file, sample_id, output_file):
+    def process_file_by_format(self, file_path, filename, source_key, tokens_remaining, sample_id, output_file):
         """Process file based on its format"""
         current_tokens = 0
         examples_added = 0
@@ -66,39 +69,37 @@ class GenerateSampleDolminoMix:
                     with dctx.stream_reader(compressed_file) as reader:
                         text_stream = io.TextIOWrapper(reader, encoding='utf-8')
                         for line in text_stream:
-                            if current_tokens >= tokens_per_file:
+                            if current_tokens >= tokens_remaining:
                                 break
                             
-                            examples_added += self.process_line(
-                                line, source_key, sample_id + examples_added, 
-                                output_file, tokens_per_file, current_tokens
-                            )
-                            current_tokens = self.source_stats[source_key]['tokens'] - (
-                                self.source_stats[source_key]['tokens'] - current_tokens - 
-                                (len(line) // self.estimated_characters_per_token if examples_added > 0 else 0)
-                            )
+                            added_tokens = self.process_line(line, source_key, sample_id + examples_added, output_file, tokens_remaining, current_tokens)
+                            if added_tokens > 0:
+                                examples_added += 1
+                                current_tokens += added_tokens
                             
             elif filename.endswith('.jsonl'):
                 # Handle plain JSONL files (math)
                 with open(file_path, 'r', encoding='utf-8') as f:
                     for line in f:
-                        if current_tokens >= tokens_per_file:
+                        if current_tokens >= tokens_remaining:
                             break
                         
-                        if self.process_line(line, source_key, sample_id + examples_added, output_file, tokens_per_file, current_tokens):
+                        added_tokens = self.process_line(line, source_key, sample_id + examples_added, output_file, tokens_remaining, current_tokens)
+                        if added_tokens > 0:
                             examples_added += 1
-                            current_tokens += len(line) // self.estimated_characters_per_token
+                            current_tokens += added_tokens
                             
             elif filename.endswith('.json.gz'):
                 # Handle gzip compressed JSON files (flan, pes2o, arxiv, stackexchange, wiki)
                 with gzip.open(file_path, 'rt', encoding='utf-8') as f:
                     for line in f:
-                        if current_tokens >= tokens_per_file:
+                        if current_tokens >= tokens_remaining:
                             break
                         
-                        if self.process_line(line, source_key, sample_id + examples_added, output_file, tokens_per_file, current_tokens):
+                        added_tokens = self.process_line(line, source_key, sample_id + examples_added, output_file, tokens_remaining, current_tokens)
+                        if added_tokens > 0:
                             examples_added += 1
-                            current_tokens += len(line) // self.estimated_characters_per_token
+                            current_tokens += added_tokens
             
             return current_tokens, examples_added
             
@@ -106,18 +107,18 @@ class GenerateSampleDolminoMix:
             print(f"    Error processing file content: {e}")
             return current_tokens, examples_added
     
-    def process_line(self, line, source_key, sample_id, output_file, tokens_per_file, current_tokens):
+    def process_line(self, line, source_key, sample_id, output_file, tokens_remaining, current_tokens):
         """Process a single line from any file format"""
         try:
             example = json.loads(line.strip())
             text = example.get('text', '')
             
             if not text:
-                return False
+                return 0
             
             example_tokens = len(text) // self.estimated_characters_per_token
             
-            if current_tokens + example_tokens <= tokens_per_file:
+            if current_tokens + example_tokens <= tokens_remaining:
                 megatron_example = {
                     "text": text,
                     "src": source_key,
@@ -128,12 +129,12 @@ class GenerateSampleDolminoMix:
                 
                 # Write immediately instead of storing
                 self.write_example(megatron_example, output_file)
-                return True
+                return example_tokens  # Return the actual tokens added
             else:
-                return False
+                return 0  # Didn't add this example
                 
         except json.JSONDecodeError:
-            return False
+            return 0
     
     def check_memory_usage(self):
         """Monitor memory usage and warn if getting high"""
@@ -160,7 +161,12 @@ class GenerateSampleDolminoMix:
             self.check_memory_usage()
             print(f"    Progress: {self.total_examples:,} examples, {self.total_tokens:,} tokens")
     
-    def download_sample(self, output_path: str) -> None:
+    def download_sample(self, output_path: str, seed: int = None) -> None:
+        # Set random seed for reproducibility if provided
+        if seed is not None:
+            random.seed(seed)
+            print(f"Using random seed: {seed}")
+        
         print(f"Loading repo files")
         self.files = list_repo_files(self.dataset_name, repo_type="dataset")
         
@@ -189,14 +195,17 @@ class GenerateSampleDolminoMix:
                 files_needed = self.file_counts[source_key]
                 selected_files = random.sample(file_subset, min(files_needed, len(file_subset)))
                 
-                # Calculate target tokens per file
-                tokens_per_file = target_tokens // len(selected_files)
-                
                 source_tokens_collected = 0
+                tokens_remaining = target_tokens
                 
-                # Process each file
+                # Process files until we hit the target
                 for file_idx, filename in enumerate(selected_files):
+                    if tokens_remaining <= 0:
+                        print(f"  Target reached! Stopping at file {file_idx}")
+                        break
+                        
                     print(f"  Processing file {file_idx+1}/{len(selected_files)}: {filename}")
+                    print(f"    Tokens remaining for {source_key}: {tokens_remaining:,}")
                     
                     try:
                         temp_dir = tempfile.mkdtemp()
@@ -209,13 +218,23 @@ class GenerateSampleDolminoMix:
                                 cache_dir=temp_dir
                             )
                             
-                            # Process file based on its format
+                            # Process file based on its format, using remaining tokens as limit
                             current_tokens, examples_added = self.process_file_by_format(
-                                file_path, filename, source_key, tokens_per_file, sample_id, output_file
+                                file_path, filename, source_key, tokens_remaining, sample_id, output_file
                             )
+                            
+                            # Record that we sampled from this file (only if we got tokens)
+                            if current_tokens > 0:
+                                self.sampled_files[source_key].append({
+                                    "filename": filename,
+                                    "tokens_sampled": current_tokens,
+                                    "examples_sampled": examples_added
+                                })
                             
                             sample_id += examples_added
                             source_tokens_collected += current_tokens
+                            tokens_remaining -= current_tokens
+                            
                             print(f"    Sampled {current_tokens:,} tokens from this file")
                             print(f"    Source total so far: {source_tokens_collected:,} tokens")
                             
@@ -229,7 +248,35 @@ class GenerateSampleDolminoMix:
                 print(f"  Completed {source_key}: {source_tokens_collected:,} tokens")
         
         print(f"\nProcessing complete! Data written to: {output_path}")
+        
+        # Save sampled files metadata
+        metadata_path = output_path.replace('.json', '_sampled_files.json').replace('.jsonl', '_sampled_files.json')
+        self.save_sampled_files_metadata(metadata_path, seed)
+        
         self.print_final_stats()
+    
+    def save_sampled_files_metadata(self, metadata_path: str, seed: int = None):
+        """Save metadata about which files were sampled"""
+        metadata = {
+            "dataset_name": self.dataset_name,
+            "random_seed": seed,
+            "total_tokens_sampled": self.total_tokens,
+            "total_examples_sampled": self.total_examples,
+            "sampled_files_by_source": dict(self.sampled_files),
+            "target_tokens_by_source": self.tokens_per_source,
+            "actual_tokens_by_source": {src: stats['tokens'] for src, stats in self.source_stats.items()}
+        }
+        
+        with open(metadata_path, 'w', encoding='utf-8') as f:
+            json.dump(metadata, f, indent=2, ensure_ascii=False)
+        
+        print(f"Sampled files metadata saved to: {metadata_path}")
+        
+        # Print summary of files sampled
+        total_files = sum(len(files) for files in self.sampled_files.values())
+        print(f"Total files sampled: {total_files}")
+        for source, files in self.sampled_files.items():
+            print(f"  {source}: {len(files)} files")
     
     def print_final_stats(self):
         """Print final statistics"""
@@ -264,8 +311,14 @@ if __name__ == "__main__":
         default=55000000000,
         help="Total number of tokens to sample (default: 55B)"
     )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=None,
+        help="Random seed for reproducible sampling (optional)"
+    )
     
     args = parser.parse_args()
     
     sampler = GenerateSampleDolminoMix(num_samples=args.tokens)
-    sampler.download_sample(args.output_path)
+    sampler.download_sample(args.output_path, seed=args.seed)
