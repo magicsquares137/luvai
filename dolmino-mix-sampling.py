@@ -12,22 +12,31 @@ import os
 from collections import defaultdict
 from typing import Dict
 
+# Run with sudo $(which python) dolmino-mix-sampling.py /mnt/seagate/dolmino_full/data/dolmino_mix_sample_55B.json
+
 class GenerateSampleDolminoMix:
-    def __init__(self, num_samples: int, tokens_per_source: Dict = None) -> None:
+    def __init__(self, num_samples: int, tokens_per_source: Dict = None, augment_with_olmo_mix: bool = True) -> None:
         self.num_samples = num_samples
         self.estimated_characters_per_token = 4
         if not tokens_per_source:
             self.tokens_per_source = {
                 "dclm": 52300000000,        # 52.3B
-                "flan": 1170000000,         # 1.17B
                 "pes2o": 825000000,         # 825M  
-                "arxiv": 292000000,         # 292M
                 "math": 172000000,          # 172M
                 "stackexchange": 166000000, # 166M
                 "wiki": 51000000            # 51M
             }
         else:
             self.tokens_per_source = tokens_per_source
+
+        # If augment with Olmomix is true we will pull certain samples from olmo mix
+        if augment_with_olmo_mix:
+            self.tokens_per_source_olmo = {
+                "starcoder": 1170000000,
+                "arxiv": 292000000,
+            }
+        self.augment_with_olmo_mix = augment_with_olmo_mix
+
         self.tokens_per_gz = 150000000 # 150M tokens per file estimate
         self.dataset_name = "allenai/dolmino-mix-1124"
         
@@ -47,11 +56,11 @@ class GenerateSampleDolminoMix:
     def get_file_subset_for_source(self, source_key):
         """Get appropriate file subset based on source and file format"""
         if source_key == "dclm":
-            # DCLM uses .zst files
             return [file for file in self.files if source_key in file and file.endswith('.zst')]
         elif source_key == "math":
-            # Math uses .jsonl files
-            return [file for file in self.files if source_key in file and file.endswith('.jsonl')]
+            # Math uses .jsonl, .json.gz, and .zst files
+            return [file for file in self.files if source_key in file and 
+                    (file.endswith('.jsonl') or file.endswith('.json.gz') or file.endswith('.zst') or file.endswith('.jsonl.gz') or file.endswith('.gz'))]
         else:
             # Others use .json.gz files
             return [file for file in self.files if source_key in file and file.endswith('.json.gz')]
@@ -91,6 +100,18 @@ class GenerateSampleDolminoMix:
                             
             elif filename.endswith('.json.gz'):
                 # Handle gzip compressed JSON files (flan, pes2o, arxiv, stackexchange, wiki)
+                with gzip.open(file_path, 'rt', encoding='utf-8') as f:
+                    for line in f:
+                        if current_tokens >= tokens_remaining:
+                            break
+                        
+                        added_tokens = self.process_line(line, source_key, sample_id + examples_added, output_file, tokens_remaining, current_tokens)
+                        if added_tokens > 0:
+                            examples_added += 1
+                            current_tokens += added_tokens
+
+            elif filename.endswith('.gz'):
+                # Handle other gzip files (fallback)
                 with gzip.open(file_path, 'rt', encoding='utf-8') as f:
                     for line in f:
                         if current_tokens >= tokens_remaining:
@@ -161,6 +182,131 @@ class GenerateSampleDolminoMix:
             self.check_memory_usage()
             print(f"    Progress: {self.total_examples:,} examples, {self.total_tokens:,} tokens")
     
+    def get_olmo_file_subset_for_source(self, source_key):
+            """Get file subset from olmo-mix for specific sources"""
+            if source_key == "starcoder":
+                return [file for file in self.olmo_files if source_key in file and file.endswith('.json.gz')]
+            elif source_key == "arxiv":
+                return [file for file in self.olmo_files if source_key in file and file.endswith('.json.gz')]
+            else:
+                return []
+        
+    def process_olmo_file_by_format(self, file_path, filename, source_key, tokens_remaining, sample_id, output_file):
+        """Process olmo-mix files (mostly .json.gz, some .jsonl.zstd for dclm)"""
+        current_tokens = 0
+        examples_added = 0
+        
+        try:
+            if filename.endswith('.jsonl.zstd'):
+                # Handle zstandard compressed files (for dclm if needed)
+                with open(file_path, 'rb') as compressed_file:
+                    dctx = zstd.ZstdDecompressor()
+                    with dctx.stream_reader(compressed_file) as reader:
+                        text_stream = io.TextIOWrapper(reader, encoding='utf-8')
+                        for line in text_stream:
+                            if current_tokens >= tokens_remaining:
+                                break
+                            
+                            added_tokens = self.process_line(line, source_key, sample_id + examples_added, output_file, tokens_remaining, current_tokens)
+                            if added_tokens > 0:
+                                examples_added += 1
+                                current_tokens += added_tokens
+            
+            elif filename.endswith('.json.gz'):
+                # Handle gzip compressed JSON files (starcoder, arxiv)
+                with gzip.open(file_path, 'rt', encoding='utf-8') as f:
+                    for line in f:
+                        if current_tokens >= tokens_remaining:
+                            break
+                        
+                        added_tokens = self.process_line(line, source_key, sample_id + examples_added, output_file, tokens_remaining, current_tokens)
+                        if added_tokens > 0:
+                            examples_added += 1
+                            current_tokens += added_tokens
+            
+            return current_tokens, examples_added
+            
+        except Exception as e:
+            print(f"    Error processing olmo file content: {e}")
+            return current_tokens, examples_added
+
+    def sample_from_olmo_mix(self, output_file, sample_id):
+        """Sample the olmo-specific sources and append to the same file"""
+        if not self.augment_with_olmo_mix:
+            return sample_id
+            
+        print(f"\n=== AUGMENTING WITH OLMO-MIX SOURCES ===")
+        
+        for source_key, target_tokens in self.tokens_per_source_olmo.items():
+            print(f"\n=== Processing OLMO {source_key} (target: {target_tokens:,} tokens) ===")
+            
+            # Get filenames from olmo-mix
+            file_subset = self.get_olmo_file_subset_for_source(source_key)
+            
+            if len(file_subset) == 0:
+                print(f"Unable to find olmo files for: {source_key}")
+                continue
+            
+            print(f"  Found {len(file_subset)} olmo files for {source_key}")
+            
+            # Calculate how many files we need
+            files_needed = int(math.ceil(target_tokens / self.tokens_per_gz))
+            selected_files = random.sample(file_subset, min(files_needed, len(file_subset)))
+            
+            source_tokens_collected = 0
+            tokens_remaining = target_tokens
+            
+            # Process files until we hit the target
+            for file_idx, filename in enumerate(selected_files):
+                if tokens_remaining <= 0:
+                    print(f"  Target reached! Stopping at file {file_idx}")
+                    break
+                    
+                print(f"  Processing OLMO file {file_idx+1}/{len(selected_files)}: {filename}")
+                print(f"    Tokens remaining for {source_key}: {tokens_remaining:,}")
+                
+                try:
+                    temp_dir = tempfile.mkdtemp()
+                    
+                    try:
+                        file_path = hf_hub_download(
+                            repo_id="allenai/olmo-mix-1124", 
+                            filename=filename, 
+                            repo_type="dataset",
+                            cache_dir=temp_dir
+                        )
+                        
+                        # Process olmo file
+                        current_tokens, examples_added = self.process_olmo_file_by_format(
+                            file_path, filename, source_key, tokens_remaining, sample_id, output_file
+                        )
+                        
+                        # Record that we sampled from this olmo file
+                        if current_tokens > 0:
+                            self.sampled_files[f"olmo_{source_key}"].append({
+                                "filename": filename,
+                                "tokens_sampled": current_tokens,
+                                "examples_sampled": examples_added
+                            })
+                        
+                        sample_id += examples_added
+                        source_tokens_collected += current_tokens
+                        tokens_remaining -= current_tokens
+                        
+                        print(f"    Sampled {current_tokens:,} tokens from this olmo file")
+                        print(f"    Source total so far: {source_tokens_collected:,} tokens")
+                        
+                    finally:
+                        shutil.rmtree(temp_dir, ignore_errors=True)
+                        
+                except Exception as e:
+                    print(f"    Error processing olmo {filename}: {e}")
+                    continue
+            
+            print(f"  Completed OLMO {source_key}: {source_tokens_collected:,} tokens")
+        
+        return sample_id
+
     def download_sample(self, output_path: str, seed: int = None) -> None:
         # Set random seed for reproducibility if provided
         if seed is not None:
@@ -169,15 +315,18 @@ class GenerateSampleDolminoMix:
         
         print(f"Loading repo files")
         self.files = list_repo_files(self.dataset_name, repo_type="dataset")
+        if self.augment_with_olmo_mix:
+            print(f"Loading olmo-mix repo files for augmentation")
+            self.olmo_files = list_repo_files("allenai/olmo-mix-1124", repo_type="dataset")
         
         sample_id = 0
         
         # Open output file once and keep it open
         with open(output_path, 'w', encoding='utf-8') as output_file:
             
-            # Process each source
+            # Process each DOLMINO source first
             for source_key, target_tokens in self.tokens_per_source.items():
-                print(f"\n=== Processing {source_key} (target: {target_tokens:,} tokens) ===")
+                print(f"\n=== Processing DOLMINO {source_key} (target: {target_tokens:,} tokens) ===")
                 
                 # Get filenames with appropriate extension for this source
                 file_subset = self.get_file_subset_for_source(source_key)
@@ -246,6 +395,9 @@ class GenerateSampleDolminoMix:
                         continue
                 
                 print(f"  Completed {source_key}: {source_tokens_collected:,} tokens")
+            
+            # Now sample from olmo-mix for the augmentation sources
+            sample_id = self.sample_from_olmo_mix(output_file, sample_id)
         
         print(f"\nProcessing complete! Data written to: {output_path}")
         
@@ -257,13 +409,18 @@ class GenerateSampleDolminoMix:
     
     def save_sampled_files_metadata(self, metadata_path: str, seed: int = None):
         """Save metadata about which files were sampled"""
+        all_targets = dict(self.tokens_per_source)
+        if self.augment_with_olmo_mix:
+            all_targets.update(self.tokens_per_source_olmo)
+            
         metadata = {
             "dataset_name": self.dataset_name,
+            "augment_with_olmo_mix": self.augment_with_olmo_mix,
             "random_seed": seed,
             "total_tokens_sampled": self.total_tokens,
             "total_examples_sampled": self.total_examples,
             "sampled_files_by_source": dict(self.sampled_files),
-            "target_tokens_by_source": self.tokens_per_source,
+            "target_tokens_by_source": all_targets,
             "actual_tokens_by_source": {src: stats['tokens'] for src, stats in self.source_stats.items()}
         }
         
@@ -288,9 +445,13 @@ class GenerateSampleDolminoMix:
         for src, stats in self.source_stats.items():
             print(f"  {src}: {stats['examples']:,} examples, {stats['tokens']:,} tokens")
         
-        # Show target vs actual
+        # Show target vs actual for all sources
+        all_targets = dict(self.tokens_per_source)
+        if self.augment_with_olmo_mix:
+            all_targets.update(self.tokens_per_source_olmo)
+            
         print(f"\nTarget vs Actual:")
-        for src, target in self.tokens_per_source.items():
+        for src, target in all_targets.items():
             actual = self.source_stats[src]['tokens']
             percentage = (actual / target) * 100 if target > 0 else 0
             print(f"  {src}: {actual:,} / {target:,} tokens ({percentage:.1f}%)")

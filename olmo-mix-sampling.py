@@ -12,8 +12,12 @@ import os
 from collections import defaultdict
 
 class GenerateSampleOlmoMix:
-    def __init__(self, num_samples: int) -> None:
+    def __init__(self, num_samples: int, seed: int = None) -> None:
         self.num_samples = num_samples
+
+        if seed:
+            random.seed(seed)
+
         self.estimated_characters_per_token = 4
         self.tokens_per_source = {
             "dclm": 52300000000,        # 52.3B
@@ -117,7 +121,7 @@ class GenerateSampleOlmoMix:
                                     with dctx.stream_reader(compressed_file) as reader:
                                         text_stream = io.TextIOWrapper(reader, encoding='utf-8')
                                         for line in text_stream:
-                                            if current_tokens >= tokens_per_file:
+                                            if source_tokens_collected >= target_tokens:
                                                 break
                                             
                                             try:
@@ -129,7 +133,7 @@ class GenerateSampleOlmoMix:
                                                 
                                                 example_tokens = len(text) // self.estimated_characters_per_token
                                                 
-                                                if current_tokens + example_tokens <= tokens_per_file:
+                                                if source_tokens_collected + example_tokens <= target_tokens:
                                                     megatron_example = {
                                                         "text": text,
                                                         "src": source_key,
@@ -142,6 +146,7 @@ class GenerateSampleOlmoMix:
                                                     self.write_example(megatron_example, output_file)
                                                     current_tokens += example_tokens
                                                     sample_id += 1
+                                                    source_tokens_collected += example_tokens
                                                 else:
                                                     break
                                                     
@@ -152,7 +157,7 @@ class GenerateSampleOlmoMix:
                                 # Handle .json.gz files
                                 with gzip.open(file_path, 'rt', encoding='utf-8') as f:
                                     for line in f:
-                                        if current_tokens >= tokens_per_file:
+                                        if source_tokens_collected >= target_tokens:
                                             break
                                         
                                         try:
@@ -164,7 +169,7 @@ class GenerateSampleOlmoMix:
                                             
                                             example_tokens = len(text) // self.estimated_characters_per_token
                                             
-                                            if current_tokens + example_tokens <= tokens_per_file:
+                                            if source_tokens_collected + example_tokens <= target_tokens:
                                                 megatron_example = {
                                                     "text": text,
                                                     "src": source_key,
@@ -177,13 +182,13 @@ class GenerateSampleOlmoMix:
                                                 self.write_example(megatron_example, output_file)
                                                 current_tokens += example_tokens
                                                 sample_id += 1
+                                                source_tokens_collected += example_tokens
                                             else:
                                                 break
                                                 
                                         except json.JSONDecodeError:
                                             continue
                             
-                            source_tokens_collected += current_tokens
                             print(f"    Sampled {current_tokens:,} tokens from this file")
                             print(f"    Source total so far: {source_tokens_collected:,} tokens")
                             
