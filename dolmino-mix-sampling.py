@@ -15,16 +15,26 @@ from typing import Dict
 # Run with sudo $(which python) dolmino-mix-sampling.py /mnt/seagate/dolmino_full/data/dolmino_mix_sample_55B.json
 
 class GenerateSampleDolminoMix:
-    def __init__(self, num_samples: int, tokens_per_source: Dict = None, augment_with_olmo_mix: bool = True) -> None:
+    def __init__(self, num_samples: int, tokens_per_source: Dict = None, augment_with_olmo_mix: bool = False) -> None:
         self.num_samples = num_samples
         self.estimated_characters_per_token = 4
         if not tokens_per_source:
+            # Uncomment below and add augment_with_olmo_mix True to sample pretraining stage 1 mix
+            # self.tokens_per_source = {
+            #     "dclm": 52300000000,        # 52.3B
+            #     "pes2o": 825000000,         # 825M  
+            #     "math": 172000000,          # 172M
+            #     "stackexchange": 166000000, # 166M
+            #     "wiki": 51000000            # 51M
+            # }
+            # Uncomment below to sample pretraining stage 2 mix
             self.tokens_per_source = {
-                "dclm": 52300000000,        # 52.3B
-                "pes2o": 825000000,         # 825M  
-                "math": 172000000,          # 172M
-                "stackexchange": 166000000, # 166M
-                "wiki": 51000000            # 51M
+                "dclm": 994000000,        # 994M
+                "flan": 332000000,         # 332M  
+                "pes2o": 117000000,        # 117M
+                "math": 416000000,          # 416M
+                "stackexchange": 49000000, # 49M
+                "wiki": 142200000            # 142.2M
             }
         else:
             self.tokens_per_source = tokens_per_source
