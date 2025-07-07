@@ -47,7 +47,7 @@ class GenerateSampleDolminoMix:
             }
         self.augment_with_olmo_mix = augment_with_olmo_mix
 
-        self.tokens_per_gz = 150000000 # 150M tokens per file estimate
+        self.tokens_per_gz = 10000000 # 150M tokens per file estimate
         self.dataset_name = "allenai/dolmino-mix-1124"
         
         # Track stats without storing data
