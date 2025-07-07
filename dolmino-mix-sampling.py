@@ -364,7 +364,7 @@ class GenerateSampleDolminoMix:
                 
                 # Process files until we hit the target
                 for file_idx, filename in enumerate(selected_files):
-                    if tokens_remaining <= 0:
+                    if tokens_remaining <= 1000:
                         print(f"  Target reached! Stopping at file {file_idx}")
                         break
                         
