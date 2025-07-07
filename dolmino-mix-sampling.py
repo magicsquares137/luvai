@@ -48,7 +48,7 @@ class GenerateSampleDolminoMix:
         self.augment_with_olmo_mix = augment_with_olmo_mix
 
         self.tokens_per_gz = 10000000 # 150M tokens per file estimate
-        self.tokens_per_gz_subject = {"default": 10000000, "math": 200000}
+        self.tokens_per_gz_subject = {"math": 200000}
         self.dataset_name = "allenai/dolmino-mix-1124"
         
         # Track stats without storing data
@@ -62,11 +62,11 @@ class GenerateSampleDolminoMix:
         # Convert desired tokens to file counts
         self.file_counts = {}
         for key, value in self.tokens_per_source.items():
-            if key != "default":
+            if key in self.tokens_per_gz_subject.keys():
                 # Have a specific estimate
                 self.file_counts[key] = int(math.ceil(value / self.tokens_per_gz_subject[key]))
             else:
-                self.file_counts[key] = int(math.ceil(value / self.tokens_per_gz_subject["default"]))
+                self.file_counts[key] = int(math.ceil(value / self.tokens_per_gz))
     
     def get_file_subset_for_source(self, source_key):
         """Get appropriate file subset based on source and file format"""
